@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <record id="view_order_form_soley" model="ir.ui.view">
+    <field name="name">sale.order.form.soley</field>
+    <field name="model">sale.order</field>
+    <field name="inherit_id" ref="sale.view_order_form"/>
+    <field name="arch" type="xml">
+      <xpath expr="//notebook" position="inside">
+        <page string="Transit &amp; Douane" name="soley_transit">
+          <group>
+            <group string="Dossier">
+              <field name="soley_flux"/>
+              <field name="soley_stage"/>
+              <field name="soley_regime"/>
+              <field name="soley_canal"/>
+              <field name="soley_mode"/>
+              <field name="soley_marchandise"/>
+              <field name="soley_hs_code"/>
+              <field name="soley_cif_usd"/>
+              <field name="soley_weight_kg"/>
+            </group>
+            <group string="Transport">
+              <field name="soley_carrier"/>
+              <field name="soley_vessel"/>
+              <field name="soley_voyage"/>
+              <field name="soley_bl_no"/>
+              <field name="soley_container_type"/>
+              <field name="soley_container_no"/>
+              <field name="soley_port_origin"/>
+              <field name="soley_port_dest"/>
+              <field name="soley_dest_city"/>
+            </group>
+          </group>
+          <group string="Jalons">
+            <group>
+              <field name="soley_bsc_no"/>
+              <field name="soley_dau_no"/>
+            </group>
+            <group>
+              <field name="soley_date_bsc"/>
+              <field name="soley_date_arrival"/>
+              <field name="soley_date_dau"/>
+              <field name="soley_date_release"/>
+              <field name="soley_date_final"/>
+            </group>
+          </group>
+        </page>
+      </xpath>
+    </field>
+  </record>
+
+  <record id="view_order_tree_soley" model="ir.ui.view">
+    <field name="name">sale.order.tree.soley</field>
+    <field name="model">sale.order</field>
+    <field name="inherit_id" ref="sale.view_order_tree"/>
+    <field name="arch" type="xml">
+      <xpath expr="//field[@name='partner_id']" position="after">
+        <field name="soley_flux" optional="show"/>
+        <field name="soley_stage" optional="show"/>
+        <field name="soley_canal" optional="hide"/>
+      </xpath>
+    </field>
+  </record>
+
+  <record id="view_order_search_soley" model="ir.ui.view">
+    <field name="name">sale.order.search.soley</field>
+    <field name="model">sale.order</field>
+    <field name="inherit_id" ref="sale.view_sales_order_filter"/>
+    <field name="arch" type="xml">
+      <xpath expr="//search" position="inside">
+        <separator/>
+        <filter string="Import" name="soley_import" domain="[('soley_flux','=','import')]"/>
+        <filter string="Export" name="soley_export" domain="[('soley_flux','=','export')]"/>
+        <filter string="Canal rouge" name="soley_rouge" domain="[('soley_canal','=','rouge')]"/>
+        <filter string="Dossiers en cours" name="soley_encours" domain="[('soley_stage','not in',['livre','embarque','cancel'])]"/>
+        <group>
+          <filter string="Étape du dossier" name="g_soley_stage" context="{'group_by':'soley_stage'}"/>
+          <filter string="Flux" name="g_soley_flux" context="{'group_by':'soley_flux'}"/>
+        </group>
+      </xpath>
+    </field>
+  </record>
+</odoo>
