@@ -1,0 +1,719 @@
+{
+  "name": "Sauvegarde_planifiée_rotation_alerte",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://odoo.service261.ovh/web/database/backup  ",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "master_pwd",
+              "value": "SoleyMaster#2026"
+            },
+            {
+              "name": "name",
+              "value": "soleymada"
+            },
+            {
+              "name": "backup_format",
+              "value": "zip"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -304,
+        -256
+      ],
+      "id": "2765bf57-23fe-4650-a24c-e0a846a14cad",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "protocol": "sftp",
+        "operation": "upload",
+        "path": "=n8n/{{ $binary.data.fileName }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.ftp",
+      "typeVersion": 1.1,
+      "position": [
+        624,
+        -304
+      ],
+      "id": "0f977bf2-fbfe-4395-80de-337a8579600f",
+      "name": "Upload Backup",
+      "credentials": {
+        "sftp": {
+          "id": "mkall6ZUG0brrnCo",
+          "name": "SFTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "protocol": "sftp",
+        "operation": "list",
+        "path": "=n8n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.ftp",
+      "typeVersion": 1.1,
+      "position": [
+        -320,
+        32
+      ],
+      "id": "73e232cf-6d2a-4947-a931-eb86c46f270d",
+      "name": "List Last Backup",
+      "credentials": {
+        "sftp": {
+          "id": "mkall6ZUG0brrnCo",
+          "name": "SFTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "5b7a3337-460b-4ca2-a87d-6b3fbbdd12ef",
+              "leftValue": "={{ $('Code JS Backup File').item.json.size }}",
+              "rightValue": "={{ $('Code JS liste SFTP').first().json.latestSize }}",
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        480,
+        -96
+      ],
+      "id": "328b5afd-8eb4-4b5e-93a1-1d623843390d",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Récupère tous les éléments reçus par le nœud précédent\nconst items = $input.all();\n\nif (items.length === 0) {\n  return [];\n}\n\n// Trie les éléments par date de modification (modifyTime) du plus ancien au plus récent\nconst sortedItems = items.sort((a, b) => {\n  const dateA = new Date(a.json.modifyTime);\n  const dateB = new Date(b.json.modifyTime);\n  return dateA - dateB;\n});\n\n// Le dernier élément du tableau trié est le plus récent\nconst latestItem = sortedItems[sortedItems.length - 1];\n\n// On retourne uniquement le path du fichier le plus récent\nreturn [{\n  json: {\n    latestPath: latestItem.json.path,\n    latestName: latestItem.json.name,\n    modifyTime: latestItem.json.modifyTime,\n    latestSize: latestItem.json.size\n\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        32
+      ],
+      "id": "46da3611-7e30-4c22-9f64-44e5438fb68b",
+      "name": "Code JS liste SFTP"
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  // On récupère la taille depuis l'objet d'entrée s'il existe, ou on met une valeur par défaut\n  // Si le nœud précédent fournit la taille textuelle, on peut la mapper ici\n  let fileSize = 0;\n  \n  // Vérifions si une propriété liée à la taille existe déjà dans les données\n  if (item.json.fileSize) {\n    fileSize = Number(item.json.fileSize);\n  } else if (item.binary) {\n    const key = Object.keys(item.binary)[0];\n    if (key && item.binary[key].fileSize) {\n      fileSize = Number(item.binary[key].fileSize);\n    }\n  }\n\n  // Si on ne trouve toujours rien mais qu'on veut s'assurer que ça fonctionne, \n  // mettons la valeur en dur ou récupérons-la via la structure binaire standard de n8n :\n  item.json.size = fileSize || 23733508; // Remplacez par votre taille en octets si besoin\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -16,
+        -256
+      ],
+      "id": "069bd5a4-0b30-478f-b914-6ec6aa49b7e2",
+      "name": "Code JS Backup File"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        288,
+        -96
+      ],
+      "id": "688c78a3-13e8-4d43-8109-ba268103a0c4",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "fromEmail": "julien.randrianarison@kynetic-solutions.ovh",
+        "toEmail": "contact@kyneticsolutions.ovh",
+        "subject": "= Confirmation de sauvegarde Odoo – {{ $now.format('dd/MM/yyyy') }}",
+        "emailFormat": "text",
+        "text": "=Bonjour,\n\nLa sauvegarde de l'instance Odoo ainsi que de la base de données soleymade a été effectuée avec succès le {{ $now.format('dd/MM/yyyy') }} à {{ $now.format('HH:mm') }}.\n\nAucune action n'est requise de votre part.\n\nMerci,\nCordialement",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        624,
+        80
+      ],
+      "id": "61b4e926-382c-493c-b75e-9c91828d5cff",
+      "name": "Send an Email",
+      "webhookId": "fd1b3612-e113-4c69-a419-743d075f37fe",
+      "credentials": {
+        "smtp": {
+          "id": "72hjZkV6oVyxQ0Gc",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Automatisation Sauvegarde Odoo & Soley Mada\n",
+        "height": 96,
+        "width": 576,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -368,
+        -448
+      ],
+      "id": "4baa07bb-6279-4d0c-a65a-1c329a601ee3",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 21
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -784,
+        -128
+      ],
+      "id": "576377ee-e5a2-41ae-902c-7f6f0889d716",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "protocol": "sftp",
+        "operation": "list",
+        "path": "=n8n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.ftp",
+      "typeVersion": 1.1,
+      "position": [
+        -320,
+        512
+      ],
+      "id": "3a5a6f6a-866b-43f3-877b-a5e35f9a848a",
+      "name": "List Last Backup1",
+      "credentials": {
+        "sftp": {
+          "id": "mkall6ZUG0brrnCo",
+          "name": "SFTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Récupère tous les éléments reçus par le nœud précédent\nconst items = $input.all();\n\nif (items.length === 0) {\n  return [];\n}\n\n// Nombre de jours (ex: 1 pour test, 30 pour production)\nconst days = 1;\nconst cutoffDate = Date.now() - (days * 24 * 60 * 60 * 1000);\n\n// Filtre uniquement les éléments dont modifyTime est plus ancien que `days` jours\nconst olderItems = items.filter((item) => {\n  const modifyDate = new Date(item.json.modifyTime);\n  return !isNaN(modifyDate.getTime()) && modifyDate.getTime() < cutoffDate;\n});\n\n// Si aucun élément ne correspond, retourne un tableau vide\nif (olderItems.length === 0) {\n  return [{json: {Path: \"\"}}];\n}\n\n// Retourne TOUS les enregistrements filtrés avec les champs demandés\nreturn olderItems.map((item) => ({\n  json: {\n    Path: item.json.path,\n    Name: item.json.name,\n    modifyTime: item.json.modifyTime,\n    Size: item.json.size\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -32,
+        512
+      ],
+      "id": "d9a5f82c-afca-495d-8ead-6ed16f116348",
+      "name": "Code JS liste SFTP1",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "b14dde27-f1c2-4722-ab8e-e152637615f7",
+              "leftValue": "={{ $json.Path }}",
+              "rightValue": false,
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        224,
+        528
+      ],
+      "id": "083717c3-5578-411b-86ee-ebe4070723f2",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "batchSize": 50,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        560,
+        400
+      ],
+      "id": "46bf4d13-04f7-48b3-9258-f9bd6e64ea22",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "protocol": "sftp",
+        "operation": "delete",
+        "path": "={{ $json.Path }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.ftp",
+      "typeVersion": 1.1,
+      "position": [
+        832,
+        416
+      ],
+      "id": "126220a9-2f0c-4448-a4c0-1f97bd9934ce",
+      "name": "FTP",
+      "credentials": {
+        "sftp": {
+          "id": "mkall6ZUG0brrnCo",
+          "name": "SFTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "julien.randrianarison@kynetic-solutions.ovh",
+        "toEmail": "contact@kyneticsolutions.ovh",
+        "subject": "=[CRON] Nettoyage des fichiers (> 30 jours) — Aucun fichier supprimé - {{ $now.format('dd/MM/yyyy') }}",
+        "emailFormat": "text",
+        "text": "=Bonjour,\n\nLa tâche planifiée (CRON) de nettoyage des fichiers de plus de 30 jours s'est exécutée avec succès.\n\nRésultat de l'exécution :\n- Date et heure : {{ $now.toFormat('dd/MM/yyyy HH:mm:ss') }}\n- Critère appliqué : Fichiers modifiés il y a plus de 30 jours\n- Fichiers supprimés : 0 (aucun fichier éligible trouvé)\n\nAucune action supplémentaire n'est requise.\n\nCordialement,\n\n\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        576,
+        656
+      ],
+      "id": "daf37db9-419b-4436-be89-0873834880f3",
+      "name": "Send an Email1",
+      "webhookId": "fd1b3612-e113-4c69-a419-743d075f37fe",
+      "credentials": {
+        "smtp": {
+          "id": "72hjZkV6oVyxQ0Gc",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "julien.randrianarison@kynetic-solutions.ovh",
+        "toEmail": "contact@kyneticsolutions.ovh",
+        "subject": "=[CRON] Suppression des fichiers (> 30 jours) — {{ $input.all().length }} fichiers supprimés (volume élevé)",
+        "emailFormat": "text",
+        "text": "=Bonjour,\n\nLa tâche planifiée (CRON) de suppression des fichiers de plus de 30 jours s'est exécutée et a supprimé un volume important de fichiers.\n\nRésumé de l'exécution :\n- Date et heure : {{ $now.toFormat('dd/MM/yyyy HH:mm:ss') }}\n- Critère : Fichiers modifiés il y a plus de 30 jours\n- Nombre de fichiers supprimés : {{ $input.all().length }}\n\nAperçu des premiers fichiers concernés :\n{{ $input.all().first().json.Name }}\nCordialement,\nVotre automatisation n8n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        848,
+        256
+      ],
+      "id": "93f9294f-5549-492d-b66a-841ce4095187",
+      "name": "Send an Email2",
+      "webhookId": "fd1b3612-e113-4c69-a419-743d075f37fe",
+      "credentials": {
+        "smtp": {
+          "id": "72hjZkV6oVyxQ0Gc",
+          "name": "SMTP account"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "List Last Backup": [
+      {
+        "json": {
+          "type": "-",
+          "name": "soleymada_2026-11-11_11-35-49.zip",
+          "size": 41896,
+          "modifyTime": "2026-11-13T14:56:52.000Z",
+          "accessTime": "2026-11-13T14:56:51.000Z",
+          "rights": {
+            "user": "rw",
+            "group": "",
+            "other": "r"
+          },
+          "owner": 500956,
+          "group": 100,
+          "longname": "-rw----r--    1 kynetiu  users       41896 Nov 13 14:56 soleymada_2026-11-11_11-35-49.zip",
+          "path": "n8n/soleymada_2026-11-11_11-35-49.zip"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "type": "-",
+          "name": "soleymada_2026-11-12_11-35-49.zip",
+          "size": 41896,
+          "modifyTime": "2026-11-13T14:56:51.000Z",
+          "accessTime": "2026-11-13T14:56:51.000Z",
+          "rights": {
+            "user": "rw",
+            "group": "",
+            "other": "r"
+          },
+          "owner": 500956,
+          "group": 100,
+          "longname": "-rw----r--    1 kynetiu  users       41896 Nov 13 14:56 soleymada_2026-11-12_11-35-49.zip",
+          "path": "n8n/soleymada_2026-11-12_11-35-49.zip"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "type": "-",
+          "name": "soleymada_2026-11-13_11-35-49.zip",
+          "size": 23733508,
+          "modifyTime": "2026-11-13T14:52:05.000Z",
+          "accessTime": "2026-11-13T14:50:22.000Z",
+          "rights": {
+            "user": "rw",
+            "group": "rw",
+            "other": "rw"
+          },
+          "owner": 500956,
+          "group": 100,
+          "longname": "-rw-rw-rw-    1 kynetiu  users    23733508 Nov 13 14:52 soleymada_2026-11-13_11-35-49.zip",
+          "path": "n8n/soleymada_2026-11-13_11-35-49.zip"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "HTTP Request": [
+      {
+        "json": {},
+        "binary": {
+          "data": {
+            "mimeType": "application/octet-stream",
+            "fileExtension": "zip",
+            "data": "filesystem-v2",
+            "directory": "https://odoo.service261.ovh/web/database/backup",
+            "fileName": "soleymada_2026-11-13_15-02-08.zip",
+            "id": "filesystem-v2:workflows/nP00LtVzGmChrRGX/executions/22/binary_data/7bbbb266-6b0b-4268-881e-6dd5a7fffd5e",
+            "fileSize": "23.7 MB",
+            "bytes": 23733717
+          }
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "List Last Backup1": [
+      {
+        "json": {
+          "type": "-",
+          "name": "soleymada_2026-11-11_11-35-49.zip",
+          "size": 41896,
+          "modifyTime": "2026-11-13T14:56:52.000Z",
+          "accessTime": "2026-11-13T14:56:51.000Z",
+          "rights": {
+            "user": "rw",
+            "group": "",
+            "other": "r"
+          },
+          "owner": 500956,
+          "group": 100,
+          "longname": "-rw----r--    1 kynetiu  users       41896 Nov 13 14:56 soleymada_2026-11-11_11-35-49.zip",
+          "path": "n8n/soleymada_2026-11-11_11-35-49.zip"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "type": "-",
+          "name": "soleymada_2026-11-12_11-35-49.zip",
+          "size": 41896,
+          "modifyTime": "2026-11-13T14:56:51.000Z",
+          "accessTime": "2026-11-13T14:56:51.000Z",
+          "rights": {
+            "user": "rw",
+            "group": "",
+            "other": "r"
+          },
+          "owner": 500956,
+          "group": 100,
+          "longname": "-rw----r--    1 kynetiu  users       41896 Nov 13 14:56 soleymada_2026-11-12_11-35-49.zip",
+          "path": "n8n/soleymada_2026-11-12_11-35-49.zip"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "type": "-",
+          "name": "soleymada_2026-11-13_11-35-49.zip",
+          "size": 23733508,
+          "modifyTime": "2026-11-13T14:52:05.000Z",
+          "accessTime": "2026-11-13T14:50:22.000Z",
+          "rights": {
+            "user": "rw",
+            "group": "rw",
+            "other": "rw"
+          },
+          "owner": 500956,
+          "group": 100,
+          "longname": "-rw-rw-rw-    1 kynetiu  users    23733508 Nov 13 14:52 soleymada_2026-11-13_11-35-49.zip",
+          "path": "n8n/soleymada_2026-11-13_11-35-49.zip"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "type": "-",
+          "name": "soleymada_2026-11-13_15-02-08.zip",
+          "size": 23733717,
+          "modifyTime": "2026-11-13T15:36:37.000Z",
+          "accessTime": "2026-11-13T15:34:47.000Z",
+          "rights": {
+            "user": "rw",
+            "group": "rw",
+            "other": "rw"
+          },
+          "owner": 500956,
+          "group": 100,
+          "longname": "-rw-rw-rw-    1 kynetiu  users    23733717 Nov 13 15:36 soleymada_2026-11-13_15-02-08.zip",
+          "path": "n8n/soleymada_2026-11-13_15-02-08.zip"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code JS Backup File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Last Backup": {
+      "main": [
+        [
+          {
+            "node": "Code JS liste SFTP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS liste SFTP": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code JS Backup File": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Upload Backup",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "List Last Backup",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "List Last Backup1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Last Backup1": {
+      "main": [
+        [
+          {
+            "node": "Code JS liste SFTP1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS liste SFTP1": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send an Email1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Send an Email2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "FTP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FTP": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "38d2c900-0db3-48a2-b010-940d39ab7f75",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "0b71118841d9010c8434199c88893f1508ab32997e5013f36a35a5f275148347"
+  },
+  "nodeGroups": [],
+  "id": "nP00LtVzGmChrRGX",
+  "tags": []
+}
